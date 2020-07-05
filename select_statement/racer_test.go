@@ -1,11 +1,22 @@
 package select_statement
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+)
 
 func TestRacer(t *testing.T) {
+	slowServer := makeDelayedServer(20 * time.Millisecond)
+	fastServer := makeDelayedServer(0 * time.Millisecond)
+
+	defer slowServer.Close()
+	defer fastServer.Close()
+
 	type args struct {
-		slow string
-		fast string
+		slowURL string
+		fastURL string
 	}
 	tests := []struct {
 		name       string
@@ -15,17 +26,24 @@ func TestRacer(t *testing.T) {
 		{
 			name: "with two args",
 			args: args{
-				"http://www.facebook.com",
-				"http://www.quii.co.uk",
+				slowURL: slowServer.URL,
+				fastURL: fastServer.URL,
 			},
-			wantWinner: "http://www.quii.co.uk",
+			wantWinner: fastServer.URL,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if gotWinner := Racer(tt.args.slow, tt.args.fast); gotWinner != tt.wantWinner {
+			if gotWinner := Racer(tt.args.slowURL, tt.args.fastURL); gotWinner != tt.wantWinner {
 				t.Errorf("Racer() = %v, want %v", gotWinner, tt.wantWinner)
 			}
 		})
 	}
+}
+
+func makeDelayedServer(delay time.Duration) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(delay)
+		w.WriteHeader(http.StatusOK)
+	}))
 }
